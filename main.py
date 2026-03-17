@@ -5,8 +5,11 @@ NUM_STEPS = 16
 NUM_ROWS = 16
 WIN_WIDTH = 800
 WIN_HEIGHT = 480
+NUM_STATES = 8
 
 TILE_COLORS = ("#1e1e3a", "#252545")  # alternating shades
+BUTTON_DEFAULT_COLOR = "#3a3a5c"
+BUTTON_ACTIVE_COLOR = "#2d7a2d"
 
 
 class App(tk.Tk):
@@ -17,6 +20,7 @@ class App(tk.Tk):
         self.resizable(False, False)
 
         self._numbers_visible = True
+        self.states = [{"selected": False} for _ in range(NUM_STATES)]
 
         self.bind("<Escape>", lambda _: self.destroy())
         self.bind("n", lambda _: self._toggle_numbers())
@@ -49,15 +53,32 @@ class App(tk.Tk):
                 )
                 self._number_ids.append(text_id)
 
-        # 8 buttons across the bottom two rows (tiles 225–256)
-        for i in range(8):
+        # State buttons across the bottom two rows
+        pad = 4
+        self._button_rects = []
+        for i in range(NUM_STATES):
             start = 225 + i * 2
             end = 242 + i * 2
             x0, y0, x1, y1 = self._tile_rect(start, end)
-            btn = tk.Button(self._canvas, text=f"Button {i + 1}", bg="#3a3a5c",
-                            fg="#e0e0e0", relief="flat", activebackground="#4a4a7c")
-            self._canvas.create_window(x0, y0, anchor="nw", window=btn,
-                                       width=x1 - x0, height=y1 - y0)
+            rect = self._canvas.create_rectangle(
+                x0 + pad, y0 + pad, x1 - pad, y1 - pad,
+                fill=BUTTON_DEFAULT_COLOR, outline="", tags=f"btn{i}"
+            )
+            label = self._canvas.create_text(
+                (x0 + x1) / 2, (y0 + y1) / 2,
+                text=f"Button {i + 1}", fill="#e0e0e0",
+                font=("Helvetica", 8), tags=f"btn{i}"
+            )
+            self._button_rects.append(rect)
+            for tag in (rect, label):
+                self._canvas.tag_bind(tag, "<Button-1>", lambda _, b=i: self._select_button(b))
+
+    def _select_button(self, index):
+        for i, state in enumerate(self.states):
+            state["selected"] = i == index
+        for i, rect in enumerate(self._button_rects):
+            color = BUTTON_ACTIVE_COLOR if self.states[i]["selected"] else BUTTON_DEFAULT_COLOR
+            self._canvas.itemconfigure(rect, fill=color)
 
     def _tile_rect(self, tile_start, tile_end):
         """Return (x0, y0, x1, y1) for a rectangle spanning tile_start to tile_end."""
