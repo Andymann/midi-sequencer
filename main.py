@@ -22,7 +22,9 @@ NUM_GROUPS = NUM_STATES // NUM_VISIBLE
 BPM = 94
 NOTE_INTERVALS = [(4, "1/16"), (1, "1/4"), (2, "1/8")]  # (divisor, label); first entry is default
 
-TILE_COLORS = ("#1e1e3a", "#252545")  # alternating shades
+TILE_COLORS = ("#1e1e3a", "#252545")          # alternating shades
+TILE_COLORS_GREEN = ("#1a2e1a", "#203a20")   # greenish area shades
+DEDICATED_TILES = set(range(1, 10)) | set(range(161, 170))  # tiles 1-9 and 161-169
 BUTTON_DEFAULT_COLOR = "#3a3a5c"
 BUTTON_ACTIVE_COLOR = "#2d7a2d"
 BUTTON_RECORDING_COLOR = "#8b1a1a"
@@ -74,9 +76,10 @@ class App(tk.Tk):
             for col in range(NUM_STEPS):
                 x0 = col * tile_w
                 x1 = x0 + tile_w
-                color = TILE_COLORS[(row + col) % len(TILE_COLORS)]
-                self._canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline="")
                 tile_num = row * NUM_STEPS + col + 1
+                palette = TILE_COLORS_GREEN if tile_num in DEDICATED_TILES else TILE_COLORS
+                color = palette[(row + col) % len(palette)]
+                self._canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline="")
                 text_id = self._canvas.create_text(
                     (x0 + x1) / 2, (y0 + y1) / 2,
                     text=str(tile_num),
@@ -162,6 +165,7 @@ class App(tk.Tk):
 
         # State buttons across the bottom two rows
         self._button_rects = []
+        self._button_labels = []
         for i in range(NUM_VISIBLE):
             start = 225 + i
             end = 241 + i
@@ -173,9 +177,10 @@ class App(tk.Tk):
             label = self._canvas.create_text(
                 (x0 + x1) / 2, (y0 + y1) / 2,
                 text=str(i + 1), fill="#e0e0e0",
-                font=("Helvetica", 8), tags=f"btn{i}"
+                font=("Helvetica", 22), tags=f"btn{i}"
             )
             self._button_rects.append(rect)
+            self._button_labels.append(label)
             for tag in (rect, label):
                 self._canvas.tag_bind(tag, "<Button-1>",
                     lambda _, b=i: self._select_state(self._group_index * NUM_VISIBLE + b))
@@ -191,7 +196,13 @@ class App(tk.Tk):
     def _cycle_group(self):
         self._group_index = (self._group_index + 1) % NUM_GROUPS
         self._canvas.itemconfigure(self._group_label, text=self._group_label_text())
+        self._refresh_button_labels()
         self._refresh_buttons()
+
+    def _refresh_button_labels(self):
+        offset = self._group_index * NUM_VISIBLE
+        for i, label_id in enumerate(self._button_labels):
+            self._canvas.itemconfigure(label_id, text=str(offset + i + 1))
 
     def _build_transport_button(self, start, end, label, action):
         pad = 4
@@ -279,9 +290,10 @@ class App(tk.Tk):
             state["selected"] = i == global_index
             state["active"] = i == global_index
         active_group = global_index // NUM_VISIBLE
-        if self._follow_mode:
+        if self._follow_mode and self._group_index != active_group:
             self._group_index = active_group
             self._canvas.itemconfigure(self._group_label, text=self._group_label_text())
+            self._refresh_button_labels()
         for g, ind in enumerate(self._group_indicators):
             self._canvas.itemconfigure(ind, fill="#ffffff" if g == active_group else "#444466")
         self._refresh_buttons()
